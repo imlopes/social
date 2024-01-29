@@ -1,5 +1,7 @@
-# Copyright 2020 Creu Blanca
+# Copyright 2024 Dixmit
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+
+from collections import defaultdict
 
 from odoo import api, fields, models
 
@@ -21,6 +23,31 @@ class MailMessage(models.Model):
     broker_notification_ids = fields.One2many(
         "mail.message.broker", inverse_name="mail_message_id"
     )
+    broker_notifications = fields.Json(compute="_compute_broker_notifications")
+
+    @api.depends("broker_notification_ids", "broker_notification_ids.state")
+    def _compute_broker_notifications(self):
+        for record in self:
+            broker_notification = defaultdict(
+                lambda: {"total": 0, "error": 0, "sent": 0, "outgoing": 0}
+            )
+            for notification in record.broker_notification_ids:
+                broker_notification[notification.channel_id.broker_id.broker_type][
+                    "total"
+                ] += 1
+                if notification.state == "exception":
+                    broker_notification[notification.channel_id.broker_id.broker_type][
+                        "error"
+                    ] += 1
+                if notification.state == "sent":
+                    broker_notification[notification.channel_id.broker_id.broker_type][
+                        "sent"
+                    ] += 1
+                if notification.state == "outgoing":
+                    broker_notification[notification.channel_id.broker_id.broker_type][
+                        "outgoing"
+                    ] += 1
+            record.broker_notifications = dict(broker_notification)
 
     @api.depends("broker_notification_ids")
     def _compute_broker_channel_id(self):
@@ -28,30 +55,14 @@ class MailMessage(models.Model):
             if rec.broker_notification_ids:
                 rec.broker_channel_id = rec.broker_notification_ids[0].channel_id
 
-    @api.model
-    def _message_read_dict_postprocess(self, messages, message_tree):
-        result = super()._message_read_dict_postprocess(messages, message_tree)
-        for message_dict in messages:
-            message_id = message_dict.get("id")
-            message = message_tree[message_id]
-            notifications = message.broker_notification_ids
-            if notifications:
-                message_dict.update(
-                    {
-                        "broker_channel_id": message.broker_channel_id.id,
-                        "broker_type": message.broker_type,
-                        "broker_unread": message.broker_unread,
-                        "customer_status": "sent"
-                        if all(d.state == "sent" for d in notifications)
-                        else "received"
-                        if all(d.state == "received" for d in notifications)
-                        else message_dict.get("customer_status", "error"),
-                    }
-                )
-        return result
-
     def set_message_done(self):
         # We need to set it as sudo in order to avoid collateral damages.
         # In fact, it is done with sudo on the original method
         self.sudo().filtered(lambda r: r.broker_unread).write({"broker_unread": False})
         return super().set_message_done()
+
+    def _get_message_format_fields(self):
+        result = super()._get_message_format_fields()
+        result.append("broker_type")
+        result.append("broker_notifications")
+        return result

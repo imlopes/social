@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+    <t t-inherit="mail.DiscussSidebar" t-inherit-mode="extension">
+        <xpath expr="//*[@name='beforeCategoryChat']" position="before">
+            <DiscussSidebarCategory
+                t-if="discussView.discuss.categoryBroker"
+                className="'o_DiscussSidebar_category o_DiscussSidebar_categoryBroker'"
+                record="discussView.discuss.categoryBroker"
+            />
+        </xpath>
+    </t>
+</templates>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Copyright 2020 Creu Blanca
+<!-- Copyright 2024 Dixmit
      License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl). -->
 <odoo>
     <record model="ir.ui.view" id="mail_broker_form_view">
@@ -35,7 +35,6 @@
                     <field name="can_set_webhook" invisible="1" />
                     <group>
                         <field name="name" />
-                        <field name="show_on_app" />
                         <field name="token" />
                         <field name="broker_type" />
                         <field name="integrated_webhook_state" />
@@ -45,6 +44,11 @@
                         <field name="webhook_user_id" />
                         <field name="has_new_channel_security" />
                     </group>
+                    <notebook>
+                        <page name="member" string="Members">
+                            <field name="member_ids" />
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>

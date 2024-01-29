@@ -1,4 +1,4 @@
-# Copyright 2020 Creu Blanca
+# Copyright 2024 Dixmit
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 import logging
@@ -40,7 +40,6 @@ class MailMessageBroker(models.Model):
         default="outgoing",
     )
     failure_reason = fields.Text(
-        "Failure Reason",
         readonly=1,
         help="Failure reason. This is usually the exception thrown by the"
         " email server, stored to ease the debugging of mailing issues.",
@@ -55,19 +54,19 @@ class MailMessageBroker(models.Model):
                 notifications += message.channel_id._channel_message_notifications(
                     message.mail_message_id
                 )
-            self.env["bus.bus"].sudo().sendmany(notifications)
+            self.env["bus.bus"].sudo()._sendmany(notifications)
         return messages
 
     def send(self, auto_commit=False, raise_exception=False, parse_mode="HTML"):
         for record in self:
             broker = record.channel_id.broker_id
-            with broker.work_on(broker._name) as work:
-                work.component(usage=broker.broker_type)._send(
-                    record,
-                    auto_commit=auto_commit,
-                    raise_exception=raise_exception,
-                    parse_mode=parse_mode,
-                )
+            self.env["mail.broker.%s" % broker.broker_type]._send(
+                broker,
+                record,
+                auto_commit=auto_commit,
+                raise_exception=raise_exception,
+                parse_mode=parse_mode,
+            )
 
     def mark_outgoing(self):
         return self.write({"state": "outgoing"})

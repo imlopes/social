@@ -1,19 +1,18 @@
-# Copyright 2020 Creu Blanca
+# Copyright 2024 Dixmit
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
-from odoo import api, fields, models, tools
+from odoo import Command, api, fields, models, tools
 
 
 class MailBroker(models.Model):
     _name = "mail.broker"
-    _inherit = ["collection.base"]
     _description = "Mail Broker"
 
     name = fields.Char(required=True)
     token = fields.Char(required=True)
     broker_type = fields.Selection([], required=True)
-    show_on_app = fields.Boolean(default=True)
     webhook_key = fields.Char()
     webhook_secret = fields.Char()
+    # TODO: Maybe we need to secure this information, isn't it?
     integrated_webhook_state = fields.Selection(
         [("pending", "Pending"), ("integrated", "Integrated")], readonly=True
     )
@@ -24,6 +23,9 @@ class MailBroker(models.Model):
     )
     webhook_user_id = fields.Many2one(
         "res.users", default=lambda self: self.env.user.id
+    )
+    member_ids = fields.Many2many(
+        "res.users", default=lambda self: [Command.link(self.env.user.id)]
     )
 
     _sql_constraints = [
@@ -69,45 +71,16 @@ class MailBroker(models.Model):
     def set_webhook(self):
         self.ensure_one()
         if self.can_set_webhook:
-            with self.work_on(self._name) as work:
-                work.component(usage=self.broker_type)._set_webhook()
+            self.env["mail.broker.%s" % self.broker_type]._set_webhook(self)
 
     def remove_webhook(self):
         self.ensure_one()
-        with self.work_on(self._name) as work:
-            work.component(usage=self.broker_type)._remove_webhook()
+        self.env["mail.broker.%s" % self.broker_type]._remove_webhook(self)
 
     def update_webhook(self):
         self.ensure_one()
         self.remove_webhook()
         self.set_webhook()
-
-    @api.model
-    def broker_fetch_slot(self):
-        result = []
-        for record in self.search([("show_on_app", "=", True)]):
-
-            result.append(
-                {
-                    "id": record.id,
-                    "name": record.name,
-                    "channel_name": "broker_%s" % record.id,
-                    "threads": [
-                        thread._get_thread_data()
-                        for thread in self.env["mail.channel"].search(
-                            [("show_on_app", "=", True), ("broker_id", "=", record.id)]
-                        )
-                    ],
-                }
-            )
-        return result
-
-    def channel_search(self, name):
-        self.ensure_one()
-        domain = [("broker_id", "=", self.id)]
-        if name:
-            domain += [("name", "ilike", "%" + name + "%")]
-        return self.env["mail.channel"].search(domain).read(["name"])
 
     def write(self, vals):
         res = super(MailBroker, self).write(vals)
@@ -120,16 +93,10 @@ class MailBroker(models.Model):
             self.clear_caches()
         return res
 
-    @api.model_create_single
-    def create(self, vals):
-        res = super(MailBroker, self).create(vals)
-        if (
-            "webhook_key" in vals
-            or "integrated_webhook_state" in vals
-            or "webhook_secret" in vals
-            or "webhook_user_id" in vals
-        ):
-            self.clear_caches()
+    @api.model_create_multi
+    def create(self, mvals):
+        res = super(MailBroker, self).create(mvals)
+        self.clear_caches()
         return res
 
     @api.model

@@ -1,22 +1,32 @@
-# Copyright 2020 Creu Blanca
+# Copyright 2024 Dixmit
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
 {
     "name": "Mail Broker",
     "summary": """
         Set a broker""",
-    "version": "14.0.1.0.0",
+    "version": "16.0.1.0.0",
     "license": "AGPL-3",
-    "author": "Creu Blanca,Odoo Community Association (OCA)",
+    "author": "Creu Blanca,Dixmit,Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/social",
     "qweb": ["static/src/xml/broker.xml"],
-    "depends": ["mail", "base_rest"],
+    "depends": ["mail"],
     "pre_init_hook": "pre_init_hook",
     "data": [
+        "wizards/mail_guest_manage.xml",
         "security/security.xml",
         "security/ir.model.access.csv",
         "views/mail_broker.xml",
-        "templates/assets.xml",
-        "views/mail_broker_channel.xml",
     ],
+    "assets": {
+        "mail.assets_messaging": [
+            "mail_broker/static/src/models/**/*.js",
+        ],
+        "web.assets_backend": [
+            "mail_broker/static/src/components/**/*.xml",
+        ],
+        "mail.assets_discuss_public": [
+            "mail_broker/static/src/components/**/*.xml",
+        ],
+    },
 }

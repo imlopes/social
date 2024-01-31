@@ -1,32 +1,39 @@
 # Copyright 2022 CreuBlanca
+# Copyright 2024 Dixmit
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
+import json
+from unittest.mock import patch
 
 import telegram
-from mock import patch
 from telegram.ext import ExtBot
 
-from odoo.addons.mail_broker.tests.common import MailBrokerComponentRegistryTestCase
+from odoo.tests.common import tagged
+
+from odoo.addons.mail_broker.tests.common import MailBrokerTestCase
 
 
 class MyBot(ExtBot):
     def _validate_token(self, *args, **kwargs):
         return
 
-    def setWebhook(self, *args, **kwargs):
+    async def initialize(self, *args, **kwargs):
+        return
+
+    async def setWebhook(self, *args, **kwargs):
         return {}
 
-    def get_webhook_info(self, *args, **kwargs):
+    async def get_webhook_info(self, *args, **kwargs):
         return telegram.WebhookInfo.de_json(
             {"pending_update_count": 0, "url": False, "has_custom_certificate": False},
             self,
         )
 
 
-class TestMailBrokerTelegram(MailBrokerComponentRegistryTestCase):
+@tagged("-at_install", "post_install")
+class TestMailBrokerTelegram(MailBrokerTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls._load_module_components(cls, "mail_broker_telegram")
         cls.webhook = "demo_hook"
         cls.broker = cls.env["mail.broker"].create(
             {"name": "broker", "broker_type": "telegram", "token": "token"}
@@ -122,145 +129,103 @@ class TestMailBrokerTelegram(MailBrokerComponentRegistryTestCase):
 
     def test_webhook_management(self):
         self.broker.webhook_key = self.webhook
-        self.broker.flush()
+        self.broker.flush_recordset()
         self.assertTrue(self.broker.can_set_webhook)
-        with patch.object(telegram, "Bot", MyBot):
+        with patch("telegram.Bot", MyBot):
             self.broker.set_webhook()
         self.assertEqual(self.broker.integrated_webhook_state, "integrated")
-        with patch.object(telegram, "Bot", MyBot):
+        with patch("telegram.Bot", MyBot):
             self.broker.update_webhook()
         self.assertEqual(self.broker.integrated_webhook_state, "integrated")
-        with patch.object(telegram, "Bot", MyBot):
+        with patch("telegram.Bot", MyBot):
             self.broker.remove_webhook()
         self.assertFalse(self.broker.integrated_webhook_state)
 
     def set_message(self, message, webhook):
-        with self.broker.work_on(self.broker._name) as work:
-            work.component(usage=self.broker.broker_type).post_update(
-                webhook, **message
-            )
+        self.url_open(
+            "/broker/{}/{}/update".format(self.broker.broker_type, webhook),
+            data=json.dumps(message),
+            headers={"Content-Type": "application/json"},
+        )
 
     def test_webhook_unsecure_channel(self):
 
         self.broker.webhook_key = self.webhook
-        self.broker.flush()
+        self.broker.flush_recordset()
         self.assertTrue(self.broker.can_set_webhook)
-        with patch.object(telegram, "Bot", MyBot):
+        with patch("telegram.Bot", MyBot):
             self.broker.set_webhook()
         self.assertFalse(
-            self.env["mail.broker.channel"].search([("broker_id", "=", self.broker.id)])
+            self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         )
-        slots = self.env["mail.broker"].broker_fetch_slot()
-        for slot in slots:
-            if slot["id"] == self.broker.id:
-                break
-        self.assertFalse(slot["threads"])
 
-        with patch("telegram.Bot") as mck:
-            mck.return_value = ExtBot
+        with patch("telegram.Bot", ExtBot):
             self.set_message(self.message_01, self.webhook)
-            mck.assert_called()
-        chat = self.env["mail.broker.channel"].search(
-            [("broker_id", "=", self.broker.id)]
-        )
+        chat = self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         self.assertTrue(chat)
         self.assertTrue(chat.message_ids)
-        self.assertTrue(chat.message_fetch())
-        slots = self.env["mail.broker"].broker_fetch_slot()
-        for slot in slots:
-            if slot["id"] == self.broker.id:
-                break
-        self.assertTrue(slot["threads"])
-        self.assertTrue(self.broker.channel_search("Demo"))
-        self.assertFalse(self.broker.channel_search("Not Demo"))
 
     def test_webhook_unsecure_channel_start(self):
 
         self.broker.webhook_key = self.webhook
-        self.broker.flush()
+        self.broker.flush_recordset()
         self.assertTrue(self.broker.can_set_webhook)
         with patch.object(telegram, "Bot", MyBot):
             self.broker.set_webhook()
         self.assertFalse(
-            self.env["mail.broker.channel"].search([("broker_id", "=", self.broker.id)])
+            self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         )
-        with patch("telegram.Bot") as mck:
-            mck.return_value = ExtBot
+        with patch("telegram.Bot", ExtBot):
             self.set_message(self.message_02, self.webhook)
-            mck.assert_called()
-        chat = self.env["mail.broker.channel"].search(
-            [("broker_id", "=", self.broker.id)]
-        )
+        chat = self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         self.assertTrue(chat)
         self.assertFalse(chat.message_ids)
-        self.assertFalse(chat.message_fetch())
-        with patch("telegram.Bot") as mck:
-            mck.return_value = ExtBot
+        with patch("telegram.Bot", MyBot):
             self.set_message(self.message_01, self.webhook)
-            mck.assert_called()
-        chat.refresh()
+        chat.invalidate_recordset()
         self.assertTrue(chat.message_ids)
 
     def test_webhook_secure_channel(self):
 
         self.broker.webhook_key = self.webhook
-        self.broker.flush()
+        self.broker.flush_recordset()
         self.assertTrue(self.broker.can_set_webhook)
         with patch.object(telegram, "Bot", MyBot):
             self.broker.set_webhook()
         self.broker.write(
             {"has_new_channel_security": True, "telegram_security_key": self.password}
         )
-        self.broker.flush()
+        self.broker.flush_recordset()
         self.assertFalse(
-            self.env["mail.broker.channel"].search([("broker_id", "=", self.broker.id)])
+            self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         )
-        with patch("telegram.Bot") as mck:
-            mck.return_value = ExtBot
+        with patch("telegram.Bot", ExtBot):
             self.set_message(self.message_01, self.webhook)
-            mck.assert_called()
-        chat = self.env["mail.broker.channel"].search(
-            [("broker_id", "=", self.broker.id)]
-        )
+        chat = self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         self.assertFalse(chat)
-
-        with patch("telegram.Bot") as mck:
-            mck.return_value = ExtBot
+        with patch("telegram.Bot", ExtBot):
             self.set_message(self.message_02, self.webhook)
-            mck.assert_called()
-        chat = self.env["mail.broker.channel"].search(
-            [("broker_id", "=", self.broker.id)]
-        )
+        chat = self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         self.assertFalse(chat)
-        with patch("telegram.Bot") as mck:
-            mck.return_value = ExtBot
+        with patch("telegram.Bot", ExtBot):
             self.set_message(self.message_03, self.webhook)
-            mck.assert_called()
-        chat = self.env["mail.broker.channel"].search(
-            [("broker_id", "=", self.broker.id)]
-        )
+        chat = self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         self.assertFalse(chat)
-        with patch("telegram.Bot") as mck:
-            mck.return_value = ExtBot
+        with patch("telegram.Bot", ExtBot):
             self.set_message(self.message_04, self.webhook)
-            mck.assert_called()
-        chat = self.env["mail.broker.channel"].search(
-            [("broker_id", "=", self.broker.id)]
-        )
+        chat = self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         self.assertTrue(chat)
         self.assertFalse(chat.message_ids)
-        with patch("telegram.Bot") as mck:
-            mck.return_value = ExtBot
+        with patch("telegram.Bot", ExtBot):
             self.set_message(self.message_01, self.webhook)
-            mck.assert_called()
-        chat.refresh()
+        chat.invalidate_recordset()
         self.assertTrue(chat.message_ids)
 
     def test_webhook_no_webhook(self):
         self.assertFalse(
-            self.env["mail.broker.channel"].search([("broker_id", "=", self.broker.id)])
+            self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         )
         self.set_message(self.message_01, self.webhook + self.webhook)
         self.assertFalse(
-            self.env["mail.broker.channel"].search([("broker_id", "=", self.broker.id)])
+            self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
         )

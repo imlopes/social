@@ -6,13 +6,12 @@ import mimetypes
 import traceback
 from io import BytesIO, StringIO
 
-from odoo import _
+from odoo import _, models
 from odoo.http import request
 from odoo.tools import html2plaintext
 from odoo.tools.mimetypes import guess_mimetype
 
 from odoo.addons.base.models.ir_mail_server import MailDeliveryException
-from odoo.addons.component.core import Component
 
 _logger = logging.getLogger(__name__)
 
@@ -26,35 +25,34 @@ except (ImportError, IOError) as err:
     _logger.debug(err)
 
 
-class MailBrokerTelegramService(Component):
-    _inherit = "mail.broker.base.service"
-    _name = "mail.broker.telegram.service"
-    _usage = "telegram"
+class MailBrokerTelegramService(models.AbstractModel):
+    _inherit = "mail.broker.abstract"
+    _name = "mail.broker.telegram"
     _description = "Telegram Broker services"
 
     def _get_telegram_bot(self, token=False):
-        return telegram.Bot(token or self.collection.token)
+        return telegram.Bot(token)
 
-    def _set_webhook(self):
-        bot = self._get_telegram_bot()
+    def _set_webhook(self, broker):
+        bot = self._get_telegram_bot(broker.token)
         asyncio.run(
             bot.setWebhook(
-                url=self.collection.webhook_url,
-                api_kwargs={"secret_token": self.collection.webhook_secret},
+                url=broker.webhook_url,
+                api_kwargs={"secret_token": broker.webhook_secret},
             )
         )
-        return super()._set_webhook()
+        return super()._set_webhook(broker)
 
-    async def _remove_webhook_telegram(self):
-        bot = self._get_telegram_bot()
+    async def _remove_webhook_telegram(self, broker):
+        bot = self._get_telegram_bot(broker.token)
         await bot.initialize()
         webhookinfo = await bot.get_webhook_info()
         if webhookinfo.url:
             await bot.delete_webhook(drop_pending_updates=False)
 
-    def _remove_webhook(self):
-        asyncio.run(self._remove_webhook_telegram())
-        return super()._remove_webhook()
+    def _remove_webhook(self, broker):
+        asyncio.run(self._remove_webhook_telegram(broker))
+        return super()._remove_webhook(broker)
 
     def _verify_update(self, bot_data, kwargs):
         if not bot_data["webhook_secret"]:
@@ -216,9 +214,9 @@ class MailBrokerTelegramService(Component):
             )
 
     async def _send_telegram(
-        self, record, auto_commit=False, raise_exception=False, parse_mode=False
+        self, broker, record, auto_commit=False, raise_exception=False, parse_mode=False
     ):
-        bot = self._get_telegram_bot()
+        bot = self._get_telegram_bot(broker.token)
         await bot.initialize()
         chat = await bot.get_chat(record.channel_id.token)
         message = False
@@ -240,11 +238,14 @@ class MailBrokerTelegramService(Component):
                 message = new_message
         return message
 
-    def _send(self, record, auto_commit=False, raise_exception=False, parse_mode=False):
+    def _send(
+        self, broker, record, auto_commit=False, raise_exception=False, parse_mode=False
+    ):
         message = False
         try:
-            asyncio.run(
+            message = asyncio.run(
                 self._send_telegram(
+                    broker,
                     record,
                     auto_commit=auto_commit,
                     raise_exception=raise_exception,
@@ -272,6 +273,14 @@ class MailBrokerTelegramService(Component):
                     "failure_reason": False,
                 }
             )
+        self.env["bus.bus"]._sendone(
+            record.channel_id,
+            "mail.message/insert",
+            {
+                "id": record.mail_message_id.id,
+                "broker_notifications": record.mail_message_id.broker_notifications,
+            },
+        )
         if auto_commit is True:
             # pylint: disable=invalid-commit
             self.env.cr.commit()
@@ -306,3 +315,15 @@ class MailBrokerTelegramService(Component):
             return self.env["mail.guest"].create(self._get_author_vals(broker, update))
 
         return super()._get_author(broker, update)
+
+    async def _async_update_content_after_hook(self, channel, message):
+        bot = self._get_telegram_bot(channel.broker_id.token)
+        await bot.initialize()
+        await bot.edit_message_text(
+            html2plaintext(message.body),
+            chat_id=int(channel.token),
+            message_id=int(message.broker_notification_ids.mapped("message_id")[0]),
+        )
+
+    def _update_content_after_hook(self, channel, message):
+        asyncio.run(self._async_update_content_after_hook(channel, message))

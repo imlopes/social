@@ -4,4 +4,4 @@ cryptography<37
 extract_msg
 lottie
 premailer
-python-telegram-bot<=13.11
+python-telegram-bot

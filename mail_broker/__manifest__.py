@@ -13,6 +13,7 @@
     "depends": ["mail"],
     "pre_init_hook": "pre_init_hook",
     "data": [
+        "wizards/mail_message_broker_send.xml",
         "wizards/mail_guest_manage.xml",
         "security/security.xml",
         "security/ir.model.access.csv",

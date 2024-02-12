@@ -9,6 +9,10 @@ class ResPartner(models.Model):
 
     _inherit = "res.partner"
 
+    broker_channel_ids = fields.One2many(
+        "res.partner.broker.channel", inverse_name="partner_id"
+    )
+
     def _get_channels_as_member(self):
         channels = super()._get_channels_as_member()
         if self.env.user.has_group("mail_broker.broker_user"):
@@ -36,6 +40,7 @@ class ResPartnerBrokerChannel(models.Model):
     _name = "res.partner.broker.channel"
     _description = "Technical data used to get the broker author"
 
+    name = fields.Char(related="broker_id.name")
     partner_id = fields.Many2one("res.partner", required=True)
     broker_id = fields.Many2one("mail.broker")
     broker_token = fields.Char()

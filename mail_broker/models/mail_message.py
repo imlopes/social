@@ -10,12 +10,6 @@ class MailMessage(models.Model):
 
     _inherit = "mail.message"
 
-    broker_channel_id = fields.Many2one(
-        "mail.channel",
-        readonly=True,
-        compute="_compute_broker_channel_id",
-        store=True,
-    )
     broker_unread = fields.Boolean(default=False)
     broker_type = fields.Selection(
         selection=lambda r: r.env["mail.broker"]._fields["broker_type"].selection
@@ -24,6 +18,33 @@ class MailMessage(models.Model):
         "mail.message.broker", inverse_name="mail_message_id"
     )
     broker_notifications = fields.Json(compute="_compute_broker_notifications")
+    broker_channel_ids = fields.Many2many(
+        "res.partner.broker.channel", compute="_compute_broker_channel_ids"
+    )
+    broker_channel_data = fields.Json(compute="_compute_broker_channel_ids")
+    broker_message_ids = fields.One2many(
+        "mail.message", inverse_name="broker_message_id"
+    )
+    broker_message_id = fields.Many2one("mail.message")
+
+    @api.depends("notification_ids", "broker_message_ids")
+    def _compute_broker_channel_ids(self):
+        for record in self:
+            channels = record.notification_ids.res_partner_id.broker_channel_ids.filtered(
+                lambda r: (r.broker_token, r.broker_id.id)
+                not in [
+                    (
+                        notification.channel_id.token,
+                        notification.channel_id.broker_id.id,
+                    )
+                    for notification in record.broker_message_ids.broker_notification_ids
+                ]
+            )
+            record.broker_channel_ids = channels
+            record.broker_channel_data = {
+                "channels": channels.ids,
+                "partners": channels.partner_id.ids,
+            }
 
     @api.depends("broker_notification_ids", "broker_notification_ids.state")
     def _compute_broker_notifications(self):
@@ -31,7 +52,10 @@ class MailMessage(models.Model):
             broker_notification = defaultdict(
                 lambda: {"total": 0, "error": 0, "sent": 0, "outgoing": 0}
             )
-            for notification in record.broker_notification_ids:
+            for notification in (
+                record.broker_notification_ids
+                | record.broker_message_ids.broker_notification_ids
+            ):
                 broker_notification[notification.channel_id.broker_id.broker_type][
                     "total"
                 ] += 1
@@ -65,4 +89,5 @@ class MailMessage(models.Model):
         result = super()._get_message_format_fields()
         result.append("broker_type")
         result.append("broker_notifications")
+        result.append("broker_channel_data")
         return result

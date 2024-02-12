@@ -43,6 +43,7 @@ class MailChannel(models.Model):
         email_from=False,
         date=False,
         message_id=False,
+        broker_message_id=False,
         **kwargs
     ):
         if not subtype_id:
@@ -57,6 +58,7 @@ class MailChannel(models.Model):
             "model": self._name,
             "res_id": self.id,
             "broker_type": self.broker_id.broker_type,
+            "broker_message_id": broker_message_id,
         }
         if author and author._name == "res.partner":
             vals["author_id"] = author.id

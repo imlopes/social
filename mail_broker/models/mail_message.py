@@ -26,6 +26,21 @@ class MailMessage(models.Model):
         "mail.message", inverse_name="broker_message_id"
     )
     broker_message_id = fields.Many2one("mail.message")
+    broker_thread_data = fields.Json(compute="_compute_broker_thread_data")
+
+    @api.depends("broker_message_id")
+    def _compute_broker_thread_data(self):
+        for record in self:
+            broker_thread_data = {}
+            if record.broker_message_id:
+                broker_thread_data.update(
+                    {
+                        "name": record.broker_message_id.record_name,
+                        "id": record.broker_message_id.res_id,
+                        "model": record.broker_message_id.model,
+                    }
+                )
+            record.broker_thread_data = broker_thread_data
 
     @api.depends("notification_ids", "broker_message_ids")
     def _compute_broker_channel_ids(self):
@@ -90,4 +105,5 @@ class MailMessage(models.Model):
         result.append("broker_type")
         result.append("broker_notifications")
         result.append("broker_channel_data")
+        result.append("broker_thread_data")
         return result

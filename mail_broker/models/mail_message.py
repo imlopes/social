@@ -1,7 +1,6 @@
 # Copyright 2024 Dixmit
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from collections import defaultdict
 
 from odoo import api, fields, models
 
@@ -10,12 +9,13 @@ class MailMessage(models.Model):
 
     _inherit = "mail.message"
 
-    broker_unread = fields.Boolean(default=False)
     broker_type = fields.Selection(
         selection=lambda r: r.env["mail.broker"]._fields["broker_type"].selection
     )
     broker_notification_ids = fields.One2many(
-        "mail.message.broker", inverse_name="mail_message_id"
+        "mail.notification",
+        inverse_name="mail_message_id",
+        domain=[("notification_type", "=", "broker")],
     )
     broker_notifications = fields.Json(compute="_compute_broker_notifications")
     broker_channel_ids = fields.Many2many(
@@ -45,60 +45,50 @@ class MailMessage(models.Model):
     @api.depends("notification_ids", "broker_message_ids")
     def _compute_broker_channel_ids(self):
         for record in self:
-            channels = record.notification_ids.res_partner_id.broker_channel_ids.filtered(
-                lambda r: (r.broker_token, r.broker_id.id)
-                not in [
-                    (
-                        notification.channel_id.token,
-                        notification.channel_id.broker_id.id,
-                    )
-                    for notification in record.broker_message_ids.broker_notification_ids
-                ]
-            )
+            if self.env.user.has_group("mail_broker.broker_user"):
+                channels = record.notification_ids.res_partner_id.broker_channel_ids.filtered(
+                    lambda r: (r.broker_token, r.broker_id.id)
+                    not in [
+                        (
+                            notification.broker_channel_id.token,
+                            notification.broker_channel_id.broker_id.id,
+                        )
+                        for notification in record.broker_message_ids.broker_notification_ids
+                    ]
+                )
+            else:
+                channels = self.env["res.partner.broker.channel"]
             record.broker_channel_ids = channels
             record.broker_channel_data = {
                 "channels": channels.ids,
                 "partners": channels.partner_id.ids,
             }
 
-    @api.depends("broker_notification_ids", "broker_notification_ids.state")
+    @api.depends(
+        "broker_notification_ids", "broker_notification_ids.notification_status"
+    )
     def _compute_broker_notifications(self):
         for record in self:
-            broker_notification = defaultdict(
-                lambda: {"total": 0, "error": 0, "sent": 0, "outgoing": 0}
-            )
+            broker_notification = []
             for notification in (
                 record.broker_notification_ids
                 | record.broker_message_ids.broker_notification_ids
             ):
-                broker_notification[notification.channel_id.broker_id.broker_type][
-                    "total"
-                ] += 1
-                if notification.state == "exception":
-                    broker_notification[notification.channel_id.broker_id.broker_type][
-                        "error"
-                    ] += 1
-                if notification.state == "sent":
-                    broker_notification[notification.channel_id.broker_id.broker_type][
-                        "sent"
-                    ] += 1
-                if notification.state == "outgoing":
-                    broker_notification[notification.channel_id.broker_id.broker_type][
-                        "outgoing"
-                    ] += 1
-            record.broker_notifications = dict(broker_notification)
+                broker_notification.append(
+                    {
+                        "originMessage": {"id": notification.mail_message_id.id},
+                        "type": notification.broker_channel_id.broker_id.broker_type,
+                        "state": notification.notification_status,
+                        "id": notification.id,
+                    }
+                )
+            record.broker_notifications = broker_notification
 
     @api.depends("broker_notification_ids")
     def _compute_broker_channel_id(self):
         for rec in self:
             if rec.broker_notification_ids:
-                rec.broker_channel_id = rec.broker_notification_ids[0].channel_id
-
-    def set_message_done(self):
-        # We need to set it as sudo in order to avoid collateral damages.
-        # In fact, it is done with sudo on the original method
-        self.sudo().filtered(lambda r: r.broker_unread).write({"broker_unread": False})
-        return super().set_message_done()
+                rec.broker_channel_id = rec.broker_notification_ids[0].broker_channel_id
 
     def _get_message_format_fields(self):
         result = super()._get_message_format_fields()

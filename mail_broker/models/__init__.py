@@ -1,5 +1,5 @@
 from . import mail_message
-from . import mail_message_broker
+from . import mail_notification
 from . import mail_channel
 from . import mail_broker
 from . import ir_websocket

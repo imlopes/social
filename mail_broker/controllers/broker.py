@@ -19,11 +19,13 @@ class BrokerController(Controller):
         )
         if not bot_data:
             return {}
-        dispatcher = request.env["mail.broker.%s" % usage].with_user(
-            bot_data["webhook_user_id"]
+        dispatcher = (
+            request.env["mail.broker.%s" % usage]
+            .with_user(bot_data["webhook_user_id"])
+            .with_context(no_broker_notification=True)
         )
         if not dispatcher._verify_update(bot_data, jsonrequest):
             return {}
         broker = dispatcher.env["mail.broker"].browse(bot_data["id"])
-        dispatcher._receive_update(broker.with_context(notify_broker=True), jsonrequest)
+        dispatcher._receive_update(broker, jsonrequest)
         return False

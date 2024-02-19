@@ -17,7 +17,6 @@ class MailMessage(models.Model):
         inverse_name="mail_message_id",
         domain=[("notification_type", "=", "broker")],
     )
-    broker_notifications = fields.Json(compute="_compute_broker_notifications")
     broker_channel_ids = fields.Many2many(
         "res.partner.broker.channel", compute="_compute_broker_channel_ids"
     )
@@ -64,26 +63,6 @@ class MailMessage(models.Model):
                 "partners": channels.partner_id.ids,
             }
 
-    @api.depends(
-        "broker_notification_ids", "broker_notification_ids.notification_status"
-    )
-    def _compute_broker_notifications(self):
-        for record in self:
-            broker_notification = []
-            for notification in (
-                record.broker_notification_ids
-                | record.broker_message_ids.broker_notification_ids
-            ):
-                broker_notification.append(
-                    {
-                        "originMessage": {"id": notification.mail_message_id.id},
-                        "type": notification.broker_channel_id.broker_id.broker_type,
-                        "state": notification.notification_status,
-                        "id": notification.id,
-                    }
-                )
-            record.broker_notifications = broker_notification
-
     @api.depends("broker_notification_ids")
     def _compute_broker_channel_id(self):
         for rec in self:
@@ -93,7 +72,6 @@ class MailMessage(models.Model):
     def _get_message_format_fields(self):
         result = super()._get_message_format_fields()
         result.append("broker_type")
-        result.append("broker_notifications")
         result.append("broker_channel_data")
         result.append("broker_thread_data")
         return result

@@ -203,28 +203,32 @@ class MailBrokerTelegramService(models.AbstractModel):
             if attachment_data:
                 attachments.append(attachment_data)
         if len(body) > 0 or attachments:
-            return chat.message_post_broker(
+            author = self._get_author(chat.broker_id, update)
+            message = chat.message_post(
                 body=body,
-                author=self._get_author(chat.broker_id, update),
+                author_id=author._name == "res.partner" and author.id,
                 broker_type="telegram",
                 date=update.message.date.replace(tzinfo=None),
-                message_id=update.message.message_id,
-                subtype="mt_comment",
+                # message_id=update.message.message_id,
+                subtype_xmlid="mail.mt_comment",
+                message_type="comment",
                 attachments=attachments,
             )
+            # TODO: Add receiving notification
+            return message
 
     async def _send_telegram(
         self, broker, record, auto_commit=False, raise_exception=False, parse_mode=False
     ):
         bot = self._get_telegram_bot(broker.token)
         await bot.initialize()
-        chat = await bot.get_chat(record.channel_id.token)
+        chat = await bot.get_chat(record.broker_channel_id.token)
         message = False
-        if record.body:
+        if record.mail_message_id.body:
             message = await chat.send_message(
-                html2plaintext(record.body), parse_mode=parse_mode
+                html2plaintext(record.mail_message_id.body), parse_mode=parse_mode
             )
-        for attachment in record.attachment_ids:
+        for attachment in record.mail_message_id.attachment_ids:
             if attachment.mimetype.split("/")[0] == "image":
                 new_message = await chat.send_photo(
                     BytesIO(base64.b64decode(attachment.datas))
@@ -264,21 +268,27 @@ class MailBrokerTelegramService(models.AbstractModel):
                 _logger.warning(
                     "Issue sending message with id {}: {}".format(record.id, exc)
                 )
-                record.write({"state": "exception", "failure_reason": exc})
+                record.sudo().write(
+                    {
+                        "notification_status": "exception",
+                        "failure_reason": exc,
+                        "failure_type": "unknown",
+                    }
+                )
         if message:
-            record.write(
+            record.sudo().write(
                 {
-                    "state": "sent",
-                    "message_id": message.message_id,
+                    "notification_status": "sent",
                     "failure_reason": False,
+                    "failure_type": False,
                 }
             )
         self.env["bus.bus"]._sendone(
-            record.channel_id,
+            record.broker_channel_id,
             "mail.message/insert",
             {
                 "id": record.mail_message_id.id,
-                "broker_notifications": record.mail_message_id.broker_notifications,
+                "broker_type": record.mail_message_id.broker_type,
             },
         )
         if auto_commit is True:

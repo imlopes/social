@@ -3,16 +3,8 @@
     <t t-inherit="mail.MessageViewNotification" t-inherit-mode="extension">
         <xpath expr="//div" position="after">
             <i
-                class="fa fa-telegram fa-lg text-info"
-                t-if="messageView.message.broker_type == 'telegram'"
-            />
-            <i
-                class="fa fa-telegram fa-lg text-600"
-                t-if="messageView.message.broker_notifications.telegram and messageView.message.broker_notifications.telegram.sent > 0"
-            />
-            <i
-                class="fa fa-telegram fa-lg text-danger"
-                t-if="messageView.message.broker_notifications.telegram and messageView.message.broker_notifications.telegram.error > 0"
+                class="fa fa-paper-plane text-info"
+                t-if="messageView.message.broker_type == 'telegram' and messageView.message.notifications.length == 0"
             />
         </xpath>
     </t>

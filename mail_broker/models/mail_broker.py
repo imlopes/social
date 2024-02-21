@@ -120,7 +120,7 @@ class MailBroker(models.Model):
         }
 
     @api.model
-    def _get_broker(self, key, state="integrated", broker_type=False, **kwargs):
+    def _get_broker(self, key, state="integrated", broker_type=False):
         # We are using cache in order to avoid an exploit
         if not key:
             return False

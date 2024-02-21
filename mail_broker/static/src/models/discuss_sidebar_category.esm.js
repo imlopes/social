@@ -11,7 +11,30 @@ registerPatch({
             identifying: true,
             inverse: "categoryBroker",
         }),
-
+        hasAddCommand: {
+            compute() {
+                if (this.discussAsBroker) {
+                    return true;
+                }
+                return this._super();
+            },
+        },
+        autocompleteMethod: {
+            compute() {
+                if (this.discussAsBroker) {
+                    return "broker";
+                }
+                return this._super();
+            },
+        },
+        newItemPlaceholderText: {
+            compute() {
+                if (this.discussAsBroker) {
+                    return this.env._t("Find a broker channel...");
+                }
+                return this._super();
+            },
+        },
         isServerOpen: {
             compute() {
                 // There is no server state for non-users (guests)
@@ -59,6 +82,21 @@ registerPatch({
                 }
                 return this._super();
             },
+        },
+    },
+    recordMethods: {
+        onAddItemAutocompleteSource(req, res) {
+            if (this.autocompleteMethod === "broker") {
+                this.messaging.discuss.handleAddBrokerAutocompleteSource(req, res);
+            }
+            return this._super(...arguments);
+        },
+
+        onAddItemAutocompleteSelect(ev, ui) {
+            if (this.autocompleteMethod === "broker") {
+                return this.messaging.discuss.handleAddBrokerAutocompleteSelect(ev, ui);
+            }
+            return this._super(...arguments);
         },
     },
 });

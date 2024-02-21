@@ -35,4 +35,34 @@ registerPatch({
             },
         },
     },
+    modelMethods: {
+        async searchBrokersToOpen({limit, searchTerm}) {
+            const domain = [
+                ["channel_type", "=", "broker"],
+                ["name", "ilike", searchTerm],
+            ];
+            const fields = ["channel_type", "name"];
+            const channelsData = await this.messaging.rpc({
+                model: "mail.channel",
+                method: "search_read",
+                kwargs: {
+                    domain,
+                    fields,
+                    limit,
+                },
+            });
+            return this.insert(
+                channelsData.map((channelData) =>
+                    this.messaging.models.Thread.convertData({
+                        channel: {
+                            channel_type: channelData.channel_type,
+                            id: channelData.id,
+                        },
+                        id: channelData.id,
+                        name: channelData.name,
+                    })
+                )
+            );
+        },
+    },
 });

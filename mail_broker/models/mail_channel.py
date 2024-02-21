@@ -38,7 +38,11 @@ class MailChannel(models.Model):
         message = super().message_post(
             *args, broker_type=broker_type or self.broker_id.broker_type, **kwargs
         )
-        if self.broker_id and not self.env.context.get("no_broker_notification", False):
+        if (
+            self.broker_id
+            and not self.env.context.get("no_broker_notification", False)
+            and message.message_type != "notification"
+        ):
             self.env["mail.notification"].create(
                 {
                     "mail_message_id": message.id,

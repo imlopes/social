@@ -7,7 +7,6 @@ registerPatch({
     fields: {
         avatarUrl: {
             compute() {
-                console.log(this.author);
                 if (
                     !this.author &&
                     !this.guestAuthor &&

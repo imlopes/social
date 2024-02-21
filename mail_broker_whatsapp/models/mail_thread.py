@@ -15,7 +15,6 @@ class MailThread(models.AbstractModel):
         result = {
             "token": token,
             "broker_id": broker.id,
-            "show_on_app": broker.show_on_app,
         }
         if partner:
             result["partner_id"] = partner.id
@@ -32,11 +31,11 @@ class MailThread(models.AbstractModel):
         channel = broker._get_channel_id(sanitized_number)
         partner = self._whastapp_get_partner()
         if not channel:
-            channel = self.env["mail.broker.channel"].create(
+            channel = self.env["mail.channel"].create(
                 self._get_whatsapp_channel_vals(sanitized_number, broker, partner)
             )
         else:
-            channel = self.env["mail.broker.channel"].browse(channel)
+            channel = self.env["mail.channel"].browse(channel)
         if not channel.partner_id and partner:
             channel.partner_id = partner
         return channel

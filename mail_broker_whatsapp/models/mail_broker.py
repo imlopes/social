@@ -8,6 +8,8 @@ class MailBroker(models.Model):
     _inherit = "mail.broker"
 
     whatsapp_security_key = fields.Char()
-    broker_type = fields.Selection(selection_add=[("whatsapp", "WhatsApp")])
+    broker_type = fields.Selection(
+        selection_add=[("whatsapp", "WhatsApp")], ondelete={"whatsapp": "cascade"}
+    )
     whatsapp_from_phone = fields.Char()
     whatsapp_version = fields.Char(default="15.0")

@@ -1,11 +1,21 @@
 /** @odoo-module **/
 
-import {many} from "@mail/model/model_field";
+import {attr, many} from "@mail/model/model_field";
 import {registerPatch} from "@mail/model/model_core";
 
 registerPatch({
     name: "Thread",
     fields: {
+        broker_name: attr(),
+        displayName: {
+            compute() {
+                var result = this._super();
+                if (this.channel && this.channel.channel_type === "broker") {
+                    result += " (" + this.broker_name + ")";
+                }
+                return result;
+            },
+        },
         messagesAsBrokerThread: many("Message", {
             inverse: "brokerThread",
             isCausal: true,
@@ -36,6 +46,11 @@ registerPatch({
         },
     },
     modelMethods: {
+        convertData(data) {
+            var data2 = this._super(data);
+            data2.broker_name = data.broker_name;
+            return data2;
+        },
         async searchBrokersToOpen({limit, searchTerm}) {
             const domain = [
                 ["channel_type", "=", "broker"],

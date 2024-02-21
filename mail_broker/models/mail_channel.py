@@ -21,6 +21,12 @@ class MailChannel(models.Model):
     )
     broker_token = fields.Char(related="broker_id.token", store=True, required=False)
 
+    def channel_info(self):
+        result = super().channel_info()
+        for record, item in zip(self, result):
+            item["broker_name"] = record.broker_id.name
+        return result
+
     def _generate_avatar_broker(self):
         # We will use this function to set a default avatar on each module
         return False

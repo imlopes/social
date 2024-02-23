@@ -3,7 +3,7 @@
     License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl).
  **********************************************************************************/
 
-odoo.define("mail_broker_whatsapp.phone_widget", function(require) {
+odoo.define("mail_broker_whatsapp.phone_widget", function (require) {
     "use strict";
     var basic_fields = require("web.basic_fields");
     var core = require("web.core");
@@ -17,7 +17,7 @@ odoo.define("mail_broker_whatsapp.phone_widget", function(require) {
          * @override
          * @private
          */
-        _renderReadonly: function() {
+        _renderReadonly: function () {
             var def = this._super.apply(this, arguments);
             if (this.nodeOptions.enable_sms) {
                 var $composerButton = $("<a>", {
@@ -32,7 +32,7 @@ odoo.define("mail_broker_whatsapp.phone_widget", function(require) {
 
             return def;
         },
-        _onClickWhatsapp: function(ev) {
+        _onClickWhatsapp: function (ev) {
             ev.preventDefault();
 
             var context = session.user_context;
@@ -53,7 +53,7 @@ odoo.define("mail_broker_whatsapp.phone_widget", function(require) {
                     context: context,
                 },
                 {
-                    on_close: function() {
+                    on_close: function () {
                         self.trigger_up("reload");
                     },
                 }

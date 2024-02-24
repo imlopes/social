@@ -32,7 +32,9 @@ class WhatsappComposer(models.TransientModel):
         if not record:
             return
         channel = record._whatsapp_get_channel(self.number_field_name, self.broker_id)
-        channel.broker_message_post(body=self.body)
+        channel.message_post(
+            body=self.body, subtype_xmlid="mail.mt_comment", message_type="comment"
+        )
 
     def action_view_whatsapp(self):
         self.ensure_one()
@@ -43,9 +45,8 @@ class WhatsappComposer(models.TransientModel):
         if channel:
             return {
                 "type": "ir.actions.client",
-                "tag": "mail.broker",
-                "res_model": channel._name,
-                "context": {"active_id": "broker_thread_%s" % channel.id},
+                "tag": "mail.action_discuss",
+                "params": {"active_id": "{}_{}".format(channel._name, channel.id)},
             }
         return False
 

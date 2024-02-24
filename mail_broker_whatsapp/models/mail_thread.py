@@ -28,20 +28,30 @@ class MailThread(models.AbstractModel):
         if not sanitized_number:
             raise UserError(_("Phone cannot be sanitized"))
         sanitized_number = sanitized_number[1:]
-        channel = broker._get_channel_id(sanitized_number)
-        partner = self._whastapp_get_partner()
-        if not channel:
-            channel = self.env["mail.channel"].create(
-                self._get_whatsapp_channel_vals(sanitized_number, broker, partner)
-            )
-        else:
-            channel = self.env["mail.channel"].browse(channel)
-        if not channel.partner_id and partner:
-            channel.partner_id = partner
-        return channel
+        partner = self._whatsapp_get_partner()
+        self.env["res.partner.broker.channel"].create(
+            {
+                "partner_id": partner.id,
+                "broker_id": broker.id,
+                "broker_token": sanitized_number,
+            }
+        )
+        return self.env["mail.broker.whatsapp"]._get_channel(
+            broker,
+            sanitized_number,
+            {
+                "contacts": [
+                    {
+                        "wa_id": sanitized_number,
+                        "profile": {"name": partner.display_name},
+                    }
+                ],
+                "messages": [{"from": sanitized_number}],
+            },
+            force_create=True,
+        )
 
-    def _whastapp_get_partner(self):
-        if self._name == "res.partner":
-            return self
+    def _whatsapp_get_partner(self):
         if "partner_id" in self._fields:
             return self.partner_id
+        return None

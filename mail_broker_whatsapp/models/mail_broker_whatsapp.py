@@ -58,7 +58,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
 
     def _get_channel_vals(self, broker, token, update):
         result = super()._get_channel_vals(broker, token, update)
-        for contact in update.get("contacts"):
+        for contact in update.get("contacts", []):
             if contact["wa_id"] == token:
                 result["name"] = contact["profile"]["name"]
                 continue
@@ -74,109 +74,84 @@ class MailBrokerWhatsappService(models.AbstractModel):
                         chat = self._get_channel(
                             broker, message["from"], change["value"], force_create=True
                         )
-        if not chat:
-            return
-        return self._process_update(chat, update)
+                        if not chat:
+                            continue
+                        self._process_update(chat, message, change["value"])
 
-    def _process_update(self, chat, updates):
+    def _process_update(self, chat, message, value):
         chat.ensure_one()
         body = ""
         attachments = []
-        for entry in updates["entry"]:
-            for change in entry["changes"]:
-                if change["field"] != "messages":
+        if message.get("text"):
+            body = message.get("text").get("body")
+        for key in ["image", "audio", "video", "document", "sticker"]:
+            if message.get(key):
+                image_id = message.get(key).get("id")
+                if image_id:
+                    image_info_request = requests.get(
+                        "https://graph.facebook.com/v%s/%s"
+                        % (
+                            chat.broker_id.whatsapp_version,
+                            image_id,
+                        ),
+                        headers={
+                            "Authorization": "Bearer %s" % chat.broker_id.token,
+                        },
+                        timeout=10,
+                    )
+                    image_info_request.raise_for_status()
+                    image_info = image_info_request.json()
+                    image_url = image_info["url"]
+                else:
+                    image_url = message.get(key).get("url")
+                if not image_url:
                     continue
-                for message in change["value"]["messages"]:
-                    if message.get("text"):
-                        body = message.get("text").get("body")
-                    for key in ["image", "audio", "video", "document", "sticker"]:
-                        if message.get(key):
-                            image_id = message.get(key).get("id")
-                            if image_id:
-                                image_info_request = requests.get(
-                                    "https://graph.facebook.com/v%s/%s"
-                                    % (
-                                        chat.broker_id.whatsapp_version,
-                                        image_id,
-                                    ),
-                                    headers={
-                                        "Authorization": "Bearer %s"
-                                        % chat.broker_id.token,
-                                    },
-                                    timeout=10,
-                                )
-                                image_info_request.raise_for_status()
-                                image_info = image_info_request.json()
-                                image_url = image_info["url"]
-                            else:
-                                image_url = message.get(key).get("url")
-                            if not image_url:
-                                continue
-                            image_request = requests.get(
-                                image_url,
-                                headers={
-                                    "Authorization": "Bearer %s" % chat.broker_id.token,
-                                },
-                                timeout=10,
-                            )
-                            image_request.raise_for_status()
-                            attachments.append(
-                                (
-                                    "{}{}".format(
-                                        image_id,
-                                        mimetypes.guess_extension(
-                                            image_info["mime_type"]
-                                        ),
-                                    ),
-                                    image_request.content,
-                                )
-                            )
-                    if message.get("location"):
-                        body += (
-                            '<a target="_blank" href="https://www.google.com/'
-                            'maps/search/?api=1&query=%s,%s">Location</a>'
-                            % (
-                                message["location"]["latitude"],
-                                message["location"]["longitude"],
-                            )
-                        )
-                    if message.get("contacts"):
-                        pass
-                    if len(body) > 0 or attachments:
-                        author = self._get_author(chat.broker_id, entry)
-                        message = chat.message_post(
-                            body=body,
-                            author_id=author
-                            and author._name == "res.partner"
-                            and author.id,
-                            broker_type="whatsapp",
-                            date=datetime.fromtimestamp(int(message["timestamp"])),
-                            # message_id=update.message.message_id,
-                            subtype_xmlid="mail.mt_comment",
-                            message_type="comment",
-                            attachments=attachments,
-                        )
+                image_request = requests.get(
+                    image_url,
+                    headers={
+                        "Authorization": "Bearer %s" % chat.broker_id.token,
+                    },
+                    timeout=10,
+                )
+                image_request.raise_for_status()
+                attachments.append(
+                    (
+                        "{}{}".format(
+                            image_id,
+                            mimetypes.guess_extension(image_info["mime_type"]),
+                        ),
+                        image_request.content,
+                    )
+                )
+        if message.get("location"):
+            body += (
+                '<a target="_blank" href="https://www.google.com/'
+                'maps/search/?api=1&query=%s,%s">Location</a>'
+                % (
+                    message["location"]["latitude"],
+                    message["location"]["longitude"],
+                )
+            )
+        if message.get("contacts"):
+            pass
+        if len(body) > 0 or attachments:
+            author = self._get_author(chat.broker_id, value)
+            chat.message_post(
+                body=body,
+                author_id=author and author._name == "res.partner" and author.id,
+                broker_type="whatsapp",
+                date=datetime.fromtimestamp(int(message["timestamp"])),
+                # message_id=update.message.message_id,
+                subtype_xmlid="mail.mt_comment",
+                message_type="comment",
+                attachments=attachments,
+            )
 
     def _send(
         self, broker, record, auto_commit=False, raise_exception=False, parse_mode=False
     ):
         message = False
         try:
-            if record.mail_message_id.body:
-                response = requests.post(
-                    "https://graph.facebook.com/v%s/%s/messages"
-                    % (
-                        broker.whatsapp_version,
-                        broker.whatsapp_from_phone,
-                    ),
-                    headers={"Authorization": "Bearer %s" % broker.token},
-                    json=self._send_payload(
-                        record.broker_channel_id, body=record.mail_message_id.body
-                    ),
-                    timeout=10,
-                )
-                response.raise_for_status()
-                message = response.json()
             attachment_mimetype_map = self._get_whatsapp_mimetype_kind()
             for attachment in record.mail_message_id.attachment_ids:
                 if attachment.mimetype not in attachment_mimetype_map:
@@ -225,6 +200,21 @@ class MailBrokerWhatsappService(models.AbstractModel):
                 )
                 response.raise_for_status()
                 message = response.json()
+            if record.mail_message_id.body:
+                response = requests.post(
+                    "https://graph.facebook.com/v%s/%s/messages"
+                    % (
+                        broker.whatsapp_version,
+                        broker.whatsapp_from_phone,
+                    ),
+                    headers={"Authorization": "Bearer %s" % broker.token},
+                    json=self._send_payload(
+                        record.broker_channel_id, body=record.mail_message_id.body
+                    ),
+                    timeout=10,
+                )
+                response.raise_for_status()
+                message = response.json()
         except Exception as exc:
             buff = StringIO()
             traceback.print_exc(file=buff)
@@ -237,11 +227,11 @@ class MailBrokerWhatsappService(models.AbstractModel):
                 _logger.warning(
                     "Issue sending message with id {}: {}".format(record.id, exc)
                 )
-                record.write(
+                record.sudo().write(
                     {"notification_status": "exception", "failure_reason": exc}
                 )
         if message:
-            record.write(
+            record.sudo().write(
                 {
                     "notification_status": "sent",
                     "failure_reason": False,
@@ -298,3 +288,43 @@ class MailBrokerWhatsappService(models.AbstractModel):
             "video/3gp": "video",
             "image/webp": "sticker",
         }
+
+    def _get_author(self, broker, update):
+        author_id = update.get("messages")[0].get("from")
+        if author_id:
+            broker_partner = self.env["res.partner.broker.channel"].search(
+                [("broker_id", "=", broker.id), ("broker_token", "=", str(author_id))]
+            )
+            if broker_partner:
+                return broker_partner.partner_id
+            partner = self.env["res.partner"].search(
+                [("phone_sanitized", "=", "+" + str(author_id))]
+            )
+            if partner:
+                self.env["res.partner.broker.channel"].create(
+                    {
+                        "partner_id": partner.id,
+                        "broker_id": broker.id,
+                        "broker_token": str(author_id),
+                    }
+                )
+                return partner
+            guest = self.env["mail.guest"].search(
+                [("broker_id", "=", broker.id), ("broker_token", "=", str(author_id))]
+            )
+            if guest:
+                return guest
+            author_vals = self._get_author_vals(broker, author_id, update)
+            if author_vals:
+                return self.env["mail.guest"].create(author_vals)
+
+        return False
+
+    def _get_author_vals(self, broker, author_id, update):
+        for contact in update.get("contacts", []):
+            if contact["wa_id"] == author_id:
+                return {
+                    "name": contact.get("profile", {}).get("name", "Anonymous"),
+                    "broker_id": broker.id,
+                    "broker_token": str(author_id),
+                }

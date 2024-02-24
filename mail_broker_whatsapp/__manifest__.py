@@ -12,14 +12,17 @@
     "depends": ["mail_broker", "phone_validation"],
     "external_dependencies": {"python": ["requests_toolbelt"]},
     "data": [
+        "security/ir.model.access.csv",
         "wizards/whatsapp_composer.xml",
         "views/mail_broker.xml",
-        # "templates/assets.xml",
     ],
     "assets": {
         "mail.assets_messaging": [
             "mail_broker_whatsapp/static/src/models/**/*.js",
+        ],
+        "web.assets_backend": [
             "mail_broker_whatsapp/static/src/components/**/*.xml",
+            "mail_broker_whatsapp/static/src/components/**/*.js",
         ],
     },
     "qweb": ["static/src/xml/thread.xml"],

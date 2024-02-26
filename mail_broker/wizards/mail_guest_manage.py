@@ -47,7 +47,7 @@ class MailGuestManage(models.TransientModel):
     def _channel_member_vals(self, member, partner):
         return {
             "guest_id": False,
-            "channel_id": member.broker_channel_id.id,
+            "channel_id": member.channel_id.id,
             "partner_id": partner.id,
         }
 

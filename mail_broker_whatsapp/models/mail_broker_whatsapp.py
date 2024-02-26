@@ -136,7 +136,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
             pass
         if len(body) > 0 or attachments:
             author = self._get_author(chat.broker_id, value)
-            chat.message_post(
+            new_message = chat.message_post(
                 body=body,
                 author_id=author and author._name == "res.partner" and author.id,
                 broker_type="whatsapp",
@@ -146,6 +146,36 @@ class MailBrokerWhatsappService(models.AbstractModel):
                 message_type="comment",
                 attachments=attachments,
             )
+            related_message_id = message.get("context", {}).get("id", False)
+            if related_message_id:
+                related_message = (
+                    self.env["mail.notification"]
+                    .search(
+                        [
+                            ("broker_channel_id", "=", chat.id),
+                            ("broker_message_id", "=", related_message_id),
+                        ]
+                    )
+                    .mail_message_id
+                )
+                if related_message and related_message.broker_message_id:
+                    new_related_message = (
+                        self.env[related_message.broker_message_id.model]
+                        .browse(related_message.broker_message_id.res_id)
+                        .message_post(
+                            body=body,
+                            author_id=author
+                            and author._name == "res.partner"
+                            and author.id,
+                            broker_type="whatsapp",
+                            date=datetime.fromtimestamp(int(message["timestamp"])),
+                            # message_id=update.message.message_id,
+                            subtype_xmlid="mail.mt_comment",
+                            message_type="comment",
+                            attachments=attachments,
+                        )
+                    )
+                    new_message.broker_message_id = new_related_message
 
     def _send(
         self, broker, record, auto_commit=False, raise_exception=False, parse_mode=False
@@ -235,6 +265,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
                 {
                     "notification_status": "sent",
                     "failure_reason": False,
+                    "broker_message_id": message["messages"][0]["id"],
                 }
             )
         if auto_commit is True:

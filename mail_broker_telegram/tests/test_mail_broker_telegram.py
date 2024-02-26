@@ -2,6 +2,8 @@
 # Copyright 2024 Dixmit
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 import json
+import time
+from datetime import datetime
 from unittest.mock import patch
 
 import telegram
@@ -25,6 +27,28 @@ class MyBot(ExtBot):
     async def get_webhook_info(self, *args, **kwargs):
         return telegram.WebhookInfo.de_json(
             {"pending_update_count": 0, "url": False, "has_custom_certificate": False},
+            self,
+        )
+
+    async def get_chat(self, chat_id, *args, **kwargs):
+        return telegram.Chat.de_json(
+            {
+                "id": chat_id,
+                "type": "private",
+            },
+            self,
+        )
+
+    async def _send_message(self, endpoint, data, *args, **kwargs):
+        return telegram.Message.de_json(
+            {
+                "date": time.mktime(datetime.now().timetuple()),
+                "message_id": 1234,
+                "chat": {
+                    "id": data["chat_id"],
+                    "type": "private",
+                },
+            },
             self,
         )
 
@@ -228,4 +252,36 @@ class TestMailBrokerTelegram(MailBrokerTestCase):
         self.set_message(self.message_01, self.webhook + self.webhook)
         self.assertFalse(
             self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
+        )
+
+    def test_post_message(self):
+
+        self.broker.webhook_key = self.webhook
+        self.broker.flush_recordset()
+        self.assertTrue(self.broker.can_set_webhook)
+        with patch.object(telegram, "Bot", MyBot):
+            self.broker.set_webhook()
+        self.assertFalse(
+            self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
+        )
+        with patch.object(telegram, "Bot", MyBot):
+            self.set_message(self.message_02, self.webhook)
+        channel = self.env["mail.channel"].search([("broker_id", "=", self.broker.id)])
+        self.assertFalse(
+            self.env["mail.notification"].search(
+                [("broker_channel_id", "=", channel.id)]
+            )
+        )
+
+        with patch.object(telegram, "Bot", MyBot):
+            channel.message_post(
+                # attachments=[("demo.png", b"IMAGE")],
+                body="HELLO",
+                subtype_xmlid="mail.mt_comment",
+                message_type="comment",
+            )
+        self.assertTrue(
+            self.env["mail.notification"].search(
+                [("broker_channel_id", "=", channel.id)]
+            )
         )

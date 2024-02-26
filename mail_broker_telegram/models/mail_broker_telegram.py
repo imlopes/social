@@ -204,7 +204,7 @@ class MailBrokerTelegramService(models.AbstractModel):
                 attachments.append(attachment_data)
         if len(body) > 0 or attachments:
             author = self._get_author(chat.broker_id, update)
-            message = chat.message_post(
+            new_message = chat.message_post(
                 body=body,
                 author_id=author._name == "res.partner" and author.id,
                 broker_type="telegram",
@@ -214,8 +214,37 @@ class MailBrokerTelegramService(models.AbstractModel):
                 message_type="comment",
                 attachments=attachments,
             )
-            # TODO: Add receiving notification
-            return message
+            related_message_id = (
+                update.message.reply_to_message and update.message.reply_to_message.id
+            )
+            if related_message_id:
+                related_message = (
+                    self.env["mail.notification"]
+                    .search(
+                        [
+                            ("broker_channel_id", "=", chat.id),
+                            ("broker_message_id", "=", related_message_id),
+                        ]
+                    )
+                    .mail_message_id
+                )
+                if related_message and related_message.broker_message_id:
+                    new_related_message = (
+                        self.env[related_message.broker_message_id.model]
+                        .browse(related_message.broker_message_id.res_id)
+                        .message_post(
+                            body=body,
+                            author_id=author._name == "res.partner" and author.id,
+                            broker_type="telegram",
+                            date=update.message.date.replace(tzinfo=None),
+                            # message_id=update.message.message_id,
+                            subtype_xmlid="mail.mt_comment",
+                            message_type="comment",
+                            attachments=attachments,
+                        )
+                    )
+                    new_message.broker_message_id = new_related_message
+            return new_message
 
     async def _send_telegram(
         self, broker, record, auto_commit=False, raise_exception=False, parse_mode=False
@@ -281,6 +310,7 @@ class MailBrokerTelegramService(models.AbstractModel):
                     "notification_status": "sent",
                     "failure_reason": False,
                     "failure_type": False,
+                    "broker_message_id": message.id,
                 }
             )
         self.env["bus.bus"]._sendone(

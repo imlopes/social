@@ -2,11 +2,16 @@
 <templates xml:space="preserve">
     <t t-inherit="mail.DiscussSidebar" t-inherit-mode="extension">
         <xpath expr="//*[@name='beforeCategoryChat']" position="before">
-            <DiscussSidebarCategory
-                t-if="discussView.discuss.categoryBroker"
-                className="'o_DiscussSidebar_category o_DiscussSidebar_categoryBroker'"
-                record="discussView.discuss.categoryBroker"
-            />
+            <t
+                t-foreach="discussView.discuss.categoryBrokers"
+                t-as="categoryBroker"
+                t-key="categoryBroker"
+            >
+                <DiscussSidebarCategory
+                    className="'o_DiscussSidebar_category o_DiscussSidebar_categoryBroker' + categoryBroker.broker_id"
+                    record="categoryBroker"
+                />
+            </t>
         </xpath>
     </t>
 </templates>

@@ -8,6 +8,7 @@ registerPatch({
     fields: {
         avatarUrl: {
             compute() {
+                console.log(this.channel, this.category, this);
                 // We will use the avatar provied by the channel by default
                 if (this.channel.channel_type === "broker") {
                     return `/web/image/mail.channel/${this.channel.id}/avatar_128?unique=${this.channel.avatarCacheKey}`;

@@ -132,3 +132,12 @@ class MailBroker(models.Model):
         return self._get_broker_map(state=state, broker_type=broker_type).get(
             key, False
         )
+
+    def broker_info(self):
+        return [record._broker_info() for record in self]
+
+    def _broker_info(self):
+        return {
+            "broker_id": self.id,
+            "broker_name": self.name,
+        }

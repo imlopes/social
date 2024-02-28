@@ -6,3 +6,4 @@ from . import ir_websocket
 from . import res_partner
 from . import mail_guest
 from . import mail_broker_abstract
+from . import res_users

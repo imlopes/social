@@ -25,6 +25,7 @@ class MailChannel(models.Model):
         result = super().channel_info()
         for record, item in zip(self, result):
             item["broker_name"] = record.broker_id.name
+            item["broker_id"] = record.broker_id.id
         return result
 
     def _generate_avatar_broker(self):

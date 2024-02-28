@@ -29,7 +29,7 @@
                     />
                     <button
                         name="action_view_whatsapp"
-                        string="Show log"
+                        string="Show Chat"
                         type="object"
                     />
                     <button string="Cancel" class="btn-default" special="cancel" />

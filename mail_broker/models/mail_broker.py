@@ -8,10 +8,13 @@ class MailBroker(models.Model):
     _description = "Mail Broker"
 
     name = fields.Char(required=True)
-    token = fields.Char(required=True)
+    token = fields.Char(required=True, help="Key used for integration purposes")
     broker_type = fields.Selection([], required=True)
-    webhook_key = fields.Char()
-    webhook_secret = fields.Char()
+    webhook_key = fields.Char(help="Key used on the connection URL")
+    webhook_secret = fields.Char(
+        help="""Key used to ensure that the connection is secure and
+        comes from the desired source"""
+    )
     # TODO: Maybe we need to secure this information, isn't it?
     integrated_webhook_state = fields.Selection(
         [("pending", "Pending"), ("integrated", "Integrated")], readonly=True
@@ -19,10 +22,12 @@ class MailBroker(models.Model):
     can_set_webhook = fields.Boolean(compute="_compute_webhook_checks")
     webhook_url = fields.Char(compute="_compute_webhook_url")
     has_new_channel_security = fields.Boolean(
-        help="When checked, channels are not created automatically"
+        help="When checked, channels are not created automatically. Usable on Telegram"
     )
     webhook_user_id = fields.Many2one(
-        "res.users", default=lambda self: self.env.user.id
+        "res.users",
+        default=lambda self: self.env.user.id,
+        help="User that will create the messages",
     )
     member_ids = fields.Many2many(
         "res.users", default=lambda self: [Command.link(self.env.user.id)]

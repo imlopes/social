@@ -1,7 +1,7 @@
 # Copyright 2024 Dixmit
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class ResPartner(models.Model):
@@ -40,7 +40,14 @@ class ResPartnerBrokerChannel(models.Model):
     _name = "res.partner.broker.channel"
     _description = "Technical data used to get the broker author"
 
-    name = fields.Char(related="broker_id.name")
-    partner_id = fields.Many2one("res.partner", required=True)
-    broker_id = fields.Many2one("mail.broker")
-    broker_token = fields.Char()
+    name = fields.Char(
+        compute="_compute_name", store=True, readonly=False, required=True
+    )
+    partner_id = fields.Many2one("res.partner", required=True, readonly=True)
+    broker_id = fields.Many2one("mail.broker", readonly=True)
+    broker_token = fields.Char(readonly=True)
+
+    @api.depends("broker_id")
+    def _compute_name(self):
+        for record in self:
+            record.name = record.broker_id.name

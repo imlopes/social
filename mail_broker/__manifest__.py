@@ -18,6 +18,7 @@
         "security/security.xml",
         "security/ir.model.access.csv",
         "views/mail_broker.xml",
+        "views/res_partner.xml",
     ],
     "assets": {
         "mail.assets_messaging": [

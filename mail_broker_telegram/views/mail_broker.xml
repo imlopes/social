@@ -32,6 +32,8 @@
                             >Create a bot using the command /newbot. The system will ask for a bot name. Remember that it needs to end with the word bot.</li>
                             <li>Copy the <b
                                 >token to access the HTTP API</b> to the token field.</li>
+                            <li
+                            >Define Webhook secret in order to secure the connection.</li>
                             <li>Press the Integrate webhook button  </li>
                         </ol>
                     </div>

@@ -17,38 +17,4 @@ class MailMessageBrokerSend(models.TransientModel):
     )
 
     def send(self):
-        chat_id = self.broker_channel_id.broker_id._get_channel_id(
-            self.broker_channel_id.broker_token
-        )
-        channel = self.env["mail.channel"].browse(chat_id)
-        channel.message_post(**self._get_message_vals())
-        self.env["mail.notification"].create(
-            {
-                "notification_status": "sent",
-                "mail_message_id": self.message_id.id,
-                "broker_channel_id": channel.id,
-                "notification_type": "broker",
-                "broker_type": self.broker_channel_id.broker_id.broker_type,
-            }
-        )
-        self.env["bus.bus"]._sendone(
-            self.env.user.partner_id,
-            "mail.message/insert",
-            {
-                "id": self.message_id.id,
-                "notifications": self.message_id.sudo()
-                .notification_ids._filtered_for_web_client()
-                ._notification_format(),
-            },
-        )
-        return {}
-
-    def _get_message_vals(self):
-        return {
-            "body": self.message_id.body,
-            "attachment_ids": self.message_id.attachment_ids.ids,
-            "subtype_id": self.message_id.subtype_id.id,
-            "author_id": self.env.user.partner_id.id,
-            "broker_message_id": self.message_id.id,
-            "message_type": "comment",
-        }
+        self.message_id._send_to_broker_thread(self.broker_channel_id)

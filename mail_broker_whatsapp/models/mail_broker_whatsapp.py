@@ -97,6 +97,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
                             "Authorization": "Bearer %s" % chat.broker_id.token,
                         },
                         timeout=10,
+                        proxies=self._get_proxies(),
                     )
                     image_info_request.raise_for_status()
                     image_info = image_info_request.json()
@@ -111,6 +112,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
                         "Authorization": "Bearer %s" % chat.broker_id.token,
                     },
                     timeout=10,
+                    proxies=self._get_proxies(),
                 )
                 image_request.raise_for_status()
                 attachments.append(
@@ -210,6 +212,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
                     },
                     data=m,
                     timeout=10,
+                    proxies=self._get_proxies(),
                 )
                 response.raise_for_status()
                 response = requests.post(
@@ -226,6 +229,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
                         media_name=attachment.name,
                     ),
                     timeout=10,
+                    proxies=self._get_proxies(),
                 )
                 response.raise_for_status()
                 message = response.json()
@@ -241,6 +245,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
                         record.broker_channel_id, body=record.mail_message_id.body
                     ),
                     timeout=10,
+                    proxies=self._get_proxies(),
                 )
                 response.raise_for_status()
                 message = response.json()
@@ -358,3 +363,8 @@ class MailBrokerWhatsappService(models.AbstractModel):
                     "broker_id": broker.id,
                     "broker_token": str(author_id),
                 }
+
+    def _get_proxies(self):
+        # This hook has been created in order to add a proxy if needed.
+        # By default, it does nothing.
+        return {}

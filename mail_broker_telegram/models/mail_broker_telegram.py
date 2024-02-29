@@ -258,13 +258,13 @@ class MailBrokerTelegramService(models.AbstractModel):
                 html2plaintext(record.mail_message_id.body), parse_mode=parse_mode
             )
         for attachment in record.mail_message_id.attachment_ids:
+            # Remember that files are limited to 50 Mb on Telegram
+            # https://core.telegram.org/bots/faq#handling-media
             if attachment.mimetype.split("/")[0] == "image":
-                new_message = await chat.send_photo(
-                    BytesIO(base64.b64decode(attachment.datas))
-                )
+                new_message = await chat.send_photo(BytesIO(attachment.raw))
             else:
                 new_message = await chat.send_document(
-                    BytesIO(base64.b64decode(attachment.datas)),
+                    BytesIO(attachment.raw),
                     filename=attachment.name,
                 )
             if not message:

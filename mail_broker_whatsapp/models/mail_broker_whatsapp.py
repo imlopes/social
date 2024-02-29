@@ -1,6 +1,5 @@
 # Copyright 2018 ACSONE SA/NV
 # License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl).
-import base64
 import hashlib
 import hmac
 import logging
@@ -191,7 +190,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
                     fields={
                         "file": (
                             attachment.name,
-                            base64.b64decode(attachment.datas),
+                            attachment.raw,
                             attachment.mimetype,
                         ),
                         "messaging_product": "whatsapp",

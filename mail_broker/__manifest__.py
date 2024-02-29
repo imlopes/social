@@ -9,7 +9,6 @@
     "license": "AGPL-3",
     "author": "Creu Blanca,Dixmit,Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/social",
-    "qweb": ["static/src/xml/broker.xml"],
     "depends": ["mail"],
     "pre_init_hook": "pre_init_hook",
     "data": [

@@ -24,6 +24,7 @@ class MailGuestManage(models.TransientModel):
     def _merge_partner(self, partner):
         self.env["res.partner.broker.channel"].create(
             {
+                "name": self.guest_id.broker_id.name,
                 "partner_id": partner.id,
                 "broker_id": self.guest_id.broker_id.id,
                 "broker_token": self.guest_id.broker_token,

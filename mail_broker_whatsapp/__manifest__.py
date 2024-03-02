@@ -26,5 +26,4 @@
             "mail_broker_whatsapp/static/src/components/**/*.js",
         ],
     },
-    "qweb": ["static/src/xml/thread.xml"],
 }

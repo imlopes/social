@@ -38,6 +38,7 @@ class MailThread(models.AbstractModel):
         ):
             self.env["res.partner.broker.channel"].create(
                 {
+                    "name": broker.name,
                     "partner_id": partner.id,
                     "broker_id": broker.id,
                     "broker_token": sanitized_number,

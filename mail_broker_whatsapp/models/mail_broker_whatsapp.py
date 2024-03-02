@@ -338,6 +338,7 @@ class MailBrokerWhatsappService(models.AbstractModel):
             if partner:
                 self.env["res.partner.broker.channel"].create(
                     {
+                        "name": broker.name,
                         "partner_id": partner.id,
                         "broker_id": broker.id,
                         "broker_token": str(author_id),

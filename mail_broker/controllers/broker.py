@@ -26,11 +26,6 @@ class BrokerController(Controller):
                         ("Content-Type", "application/json"),
                     ],
                 )
-            dispatcher = (
-                request.env["mail.broker.%s" % usage]
-                .with_user(bot_data["webhook_user_id"])
-                .with_context(no_broker_notification=True)
-            )
             return (
                 request.env["mail.broker.%s" % usage]
                 .with_user(bot_data["webhook_user_id"])
@@ -46,11 +41,6 @@ class BrokerController(Controller):
                     ("Content-Type", "application/json"),
                 ],
             )
-        dispatcher = (
-            request.env["mail.broker.%s" % usage]
-            .with_user(bot_data["webhook_user_id"])
-            .with_context(no_broker_notification=True)
-        )
         jsonrequest = json.loads(
             request.httprequest.get_data().decode(request.httprequest.charset)
         )
